@@ -1,7 +1,186 @@
 ﻿@page "/"
+@inject StateContainer _stateContainer;
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
 
 <PageTitle>Home</PageTitle>
 
 <h1>Hello, world!</h1>
 
 Welcome to your new app.
+<div>
+    <h3>Fighters</h3>
+    @foreach (Fighter fighter in fighters)
+    {
+        <div>
+            <div>
+                <label for="fname">Fighter Name</label>
+                <input type="text" id="fname" name="fname" @bind-value="fighter.Name"/>
+                <button @onclick="() => fighters.Add(fighter.CopyFighter())">Copy</button>
+                <button @onclick="() => RemoveFighter(fighter.Id)">Delete Fighter</button>
+            </div>
+            @foreach (Profile profile in fighter.Profiles)
+            {
+                <div>
+                    <label class="switch">
+                        <input type="checkbox" @bind-value="profile.Active">
+                        <span class="slider round"></span>
+                    </label>
+                    <input type="text" @bind-value="profile.Range" />
+                    <input type="number" @bind-value="profile.Attacks" />
+                    <input type="number" @bind-value="profile.Strength" />
+                    <input type="number" @bind-value="profile.Damage.Hit" />
+                    <input type="number" @bind-value="profile.Damage.Crit" @bind:after="SaveFighters"/>
+                    <button @onclick="() => fighter.RemoveProfile(profile.Id)">Delete Profile</button>
+                </div>
+            }
+            <div>
+                <button @onclick="() => fighter.AddProfile()">Add Profile</button>
+            </div>
+        </div>
+
+    }
+    <div>
+        <button @onclick="() => AddFighter()">Add Fighter</button>
+    </div>
+    <button @onclick="() => OpenCounterWithData()">Send It!!!</button>
+    @foreach (string s in events)
+    {
+        @s
+    }
+
+
+    <p>@mousePointerMessage</p>
+
+
+</div>
+<p>
+    <button @onclick="ReportPointerLocation">
+        Where's my mouse pointer for this button?
+    </button>
+</p>
+
+<style>
+    /* The switch - the box around the slider */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+
+        /* Hide default HTML checkbox */
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+    /* The slider */
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        -webkit-transition: .4s;
+        transition: .4s;
+    }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+
+    input:checked + .slider {
+        background-color: #2196F3;
+    }
+
+    input:focus + .slider {
+        box-shadow: 0 0 1px #2196F3;
+    }
+
+    input:checked + .slider:before {
+        -webkit-transform: translateX(26px);
+        -ms-transform: translateX(26px);
+        transform: translateX(26px);
+    }
+
+    /* Rounded sliders */
+    .slider.round {
+        border-radius: 34px;
+    }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+</style>
+@code{
+    private string? mousePointerMessage;
+    List<Fighter> fighters = new();
+    List<string> events = new();
+
+    private string bobState = "";
+    private Person bob = new()
+    {
+        FirstName = "Bob",
+        LastName = "Smith"
+    };
+
+    private class Person
+    {
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var storage = await localStorage.GetItemAsync<List<Fighter>>("fighters");
+        if (storage != null)
+        {
+            fighters = storage;
+        }
+        else
+        {
+            fighters.Add(new Fighter());
+        }
+        StateHasChanged();
+    }
+
+    public void AddFighter()
+    {
+        fighters.Add(new Fighter());
+    }
+
+    public void RemoveFighter(Guid id)
+    {
+        Fighter? fighter = fighters.Find(p => p.Id == id);
+        if (fighter != null) fighters.Remove(fighter);
+    }
+
+    public void OpenCounterWithData()
+    {
+        _stateContainer.ObjectTunnel.Add(fighters.GetHashCode(), fighters);
+
+        _navigationManager.NavigateTo($"counter/{fighters.GetHashCode()}");
+    }
+
+    private void ReportPointerLocation(MouseEventArgs e)
+    {
+        mousePointerMessage = $"Mouse coordinates: {e.ScreenX}:{e.ScreenY}";
+    }
+
+    public void SaveFighters()
+    {
+        localStorage.SetItemAsync("fighters", fighters);
+    }
+}

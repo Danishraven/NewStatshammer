@@ -1,6 +1,8 @@
+using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using NewStatshammer.Client.Models;
 using NewStatshammer.Client.Pages;
 using NewStatshammer.Components;
 using NewStatshammer.Components.Account;
@@ -36,6 +38,8 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
     .AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<StateContainer>();
+builder.Services.AddBlazoredLocalStorage();
 
 var app = builder.Build();
 
