@@ -1,5 +1,4 @@
-﻿@page "/counter/{SetHashCode:int}"
-@inject StateContainer _stateContainer;
+﻿@page "/counter"
 
 
 <PageTitle>Counter</PageTitle>
@@ -29,7 +28,6 @@
 
     protected override void OnInitialized()
     {
-        fighters = (List<Fighter>)_stateContainer.ObjectTunnel[SetHashCode];
     }
 
     private int currentCount = 0;

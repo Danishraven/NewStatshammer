@@ -1,17 +1,16 @@
-﻿using NewStatshammer.Client.Models.Interfaces;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 
 namespace NewStatshammer.Client.Models
 {
-    public class Fighter : IFighter
+    public class Fighter
     {
         public string Name { get; set; }
-        public List<IProfile> Profiles { get; set; }
+        public List<Profile> Profiles { get; set; }
         public Guid Id { get; set; }
         public Fighter()
         {
             Name = string.Empty;
-            Profiles = new List<IProfile>
+            Profiles = new List<Profile>
             {
                 new Profile()
             };
@@ -20,7 +19,7 @@ namespace NewStatshammer.Client.Models
 
         public Fighter CopyFighter()
         {
-            List<IProfile> profiles = new();
+            List<Profile> profiles = new();
             foreach (var profile in Profiles)
             {
                 profiles.Add(profile.CopyProfile());
@@ -40,7 +39,7 @@ namespace NewStatshammer.Client.Models
 
         public void RemoveProfile(Guid id)
         {
-            IProfile? profile = Profiles.Find(p => p.Id == id);
+            Profile? profile = Profiles.Find(p => p.Id == id);
             if (profile != null) Profiles.Remove(profile);
         }
     }

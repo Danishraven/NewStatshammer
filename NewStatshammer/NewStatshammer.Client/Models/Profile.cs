@@ -1,15 +1,13 @@
-﻿using NewStatshammer.Client.Models.Interfaces;
-
-namespace NewStatshammer.Client.Models
+﻿namespace NewStatshammer.Client.Models
 {
-    public class Profile : IProfile
+    public class Profile
     {
         public bool Active {  get; set; }
         public Guid Id {  get; set; }
         public string? Range {  get; set; }
         public double Attacks {  get; set; }
         public double Strength {  get; set; }
-        public IDamage Damage {  get; set; }
+        public Damage Damage {  get; set; }
         
         public Profile()
         {
@@ -20,7 +18,7 @@ namespace NewStatshammer.Client.Models
             Strength = 3;
             Damage = new Damage();
         }
-        public IProfile CopyProfile()
+        public Profile CopyProfile()
         {
             return new Profile()
             {

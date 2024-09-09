@@ -1,8 +1,6 @@
-﻿using NewStatshammer.Client.Models.Interfaces;
-
-namespace NewStatshammer.Client.Models
+﻿namespace NewStatshammer.Client.Models
 {
-    public class Damage : IDamage
+    public class Damage
     {
         public double Hit { get; set; }
         public double Crit { get; set; }
@@ -11,7 +9,7 @@ namespace NewStatshammer.Client.Models
             Hit = 1;
             Crit = 3;
         }
-        public IDamage CopyDamage () 
+        public Damage CopyDamage () 
         { 
             return new Damage 
             { 
