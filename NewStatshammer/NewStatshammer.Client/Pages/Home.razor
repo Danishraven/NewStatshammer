@@ -2,7 +2,7 @@
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 <PageTitle>Home</PageTitle>
 
-<div class="main">
+<div>
     <h3>Fighters</h3>
     @if (firstRendering)
     {
@@ -20,11 +20,11 @@
                     <div class="flex-container">
                         <div>
                             <label class="switch">
-                                <input type="checkbox" @bind-value="profile.Active">
+                                <input type="checkbox" @bind="profile.Active" @onclick="() => ChangeSwitch(fighter, profile)" @bind:after="SaveFighters">
                                 <span class="slider round"></span>
                             </label>
                         </div>
-                                <div class="input-container">
+                        <div class="input-container">
                             <label class="profile-lable" for="prange">Range</label>
                             <input class="profile-input" type="text" id="prange" name="prange" @bind="profile.Range" @bind:after="SaveFighters" />
                         </div>
@@ -162,6 +162,8 @@
         top: 0;
         font-size: 20px;
         padding-top: 20px;
+        background-color: rgba(255, 255, 255, 0.09);
+        color: white;
     }
     .profile-lable{
         z-index: 2;
@@ -172,12 +174,8 @@
     }
 
     .fighter{
-        background-color: lightgray;
+        background-color: #333;
         margin: 10px;
-    }
-
-    .main{
-
     }
 </style>
 @code{
@@ -240,5 +238,16 @@
     public void SaveFighters()
     {
         localStorage.SetItemAsync("fighters", fighters);
+    }
+
+    public void ChangeSwitch(Fighter fighter, Profile profile)
+    {
+        foreach (Profile p in fighter.Profiles)
+        {
+            if (p != profile)
+            {
+                p.Active = false;
+            }
+        }
     }
 }
