@@ -30,6 +30,10 @@
                         </div>
                         <div class="input-container">
                             <label class="profile-lable" for="patk">Attacks</label>
+                            @if (profile.Attacks > 8)
+                            {
+                                <label style="color: red; font-size: 10px; left: 40px; top: 5px; position: absolute">Preformance suffers if attacks is higher than 8</label>
+                            }
                             <input class="profile-input" type="number" id="patk" name="patk" @bind="profile.Attacks" @bind:after="SaveFighters" />
                         </div>
                         <div class="input-container">

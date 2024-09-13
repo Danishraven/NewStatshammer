@@ -1,0 +1,300 @@
+﻿@page "/stats"
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Statistics</h1>
+
+<input type="checkbox" @bind="fastCalculation" @bind:after="CalculateGenerateGraphs" />
+
+<BarChart @ref="averageDamagePerToughness" Width="1000" Height="300" />
+<div>
+    @foreach (string s in messages)
+    {
+        @s
+    }
+</div>
+
+@if (firstRendering)
+{
+    @* foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> kvp1 in dict)
+    {
+        <div>
+            @kvp1.Key.Name
+            @foreach (KeyValuePair<double, Dictionary<double, double>> item in kvp1.Value)
+            {
+                <div>                    
+                    @foreach (KeyValuePair<double, double> kvp3 in item.Value)
+                    {
+                        <div style="color:rgb(255,0,0)">
+                            damage @kvp3.Key : 
+                            @kvp3.Value
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    } *@
+}
+else
+{
+    <h1>Khorne renders</h1>
+}
+
+@code {
+    BarChart averageDamagePerToughness = default!;
+    List<LineChart> lineCharts = default!;
+
+    bool fastCalculation = false;
+    List<Fighter> fighters = new();
+    List<string> messages = new();
+    bool firstRendering = false;
+    double simulations = 1000000;
+    int minimumToughness = 3;
+    int maximumToughness = 5;
+    Dictionary<Fighter, Dictionary<double, Dictionary<double, double>>> dict = new();
+    //Datastructure
+    //dict key: Fighter
+    //dict value: ToughnessDamagePairs (DTP)
+    //DTP key: Toughness
+    //DTP value: Damages
+    //Damages key: DamageSize
+    //Damages value: DamageCount
+
+    protected override void OnInitialized()
+    {
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadFighters();
+            foreach (Fighter fighter in fighters)
+            {
+                foreach (Profile profile in fighter.Profiles)
+                {
+                    if (profile.Active && profile.Attacks > 8)
+                    {
+                        fastCalculation = true;
+                    }
+                }
+            }
+            await CalculateGenerateGraphs();
+            firstRendering = true;
+            StateHasChanged();
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public async Task CalculateGenerateGraphs()
+    {
+        dict = new();
+        await CalculateDamage();
+        ChartData chartData = new ChartData { Labels = GetDPTLabels(), Datasets = GetDefaultDataSets(3) };
+        BarChartOptions barChartOptions = new BarChartOptions { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
+        await averageDamagePerToughness.InitializeAsync(chartData, barChartOptions);
+    }
+
+    private async Task LoadFighters()
+    {
+
+        List<Fighter>? storage = null;
+        try
+        {
+            storage = await localStorage.GetItemAsync<List<Fighter>>("fighters");
+        }
+        catch (Exception e)
+        {
+            messages.Add(e.Message.ToString());
+        }
+        if (storage != null)
+        {
+            fighters = storage;
+        }
+        else
+        {
+            fighters.Add(new Fighter());
+        }
+    }
+
+    public async Task CalculateDamage()
+    {
+        Random random = new();
+        foreach (Fighter fighter in fighters)
+        {
+            foreach (Profile profile in fighter.Profiles)
+            {
+                if (profile.Active)
+                {
+                    Dictionary<double, Dictionary<double, double>> toughnessDamagePairs = new();
+                    for (int toughness = minimumToughness; toughness <= maximumToughness; toughness++)
+                    {
+                        Dictionary<double, double> damages;
+
+                        if (fastCalculation)
+                        {
+                            damages = SimulateAttacks(profile, toughness);
+                        }
+                        else
+                        {
+                            damages = CalculateAttacks(profile, toughness);
+                        }
+                        for (int i = 0; i < (profile.Damage.Crit * profile.Attacks) + 1; i++)
+                        {
+                            if (damages[i] == 0)
+                            {
+                                damages.Remove(i);
+                            }
+                        }
+                        toughnessDamagePairs.Add(toughness, damages);
+                    }
+                    dict.Add(fighter, toughnessDamagePairs);
+                }
+            }
+        }
+    }
+
+    public int CalculateToHit(double strength, double toughness)
+    {
+        if (strength > toughness)
+        {
+            return 3;     
+        }
+        else if (strength < toughness)
+        {
+            return 5;
+        }
+        else return 4;
+    }
+
+    public Dictionary<double, double> SimulateAttacks(Profile profile, int toughness)
+    {
+        Dictionary<double, double> damages = new();
+        for (int i = 0; i < (profile.Damage.Crit * profile.Attacks) + 1; i++)
+        {
+            damages.Add(i, 0);
+        }
+        int toHit = CalculateToHit(profile.Strength, toughness);
+        for (int j = 0; j < simulations; j++)
+        {
+            double damage = 0;
+            for (int i = 0; i < profile.Attacks; i++)
+            {
+                int roll = random.Next(1, 7);
+                if (roll == 6)
+                {
+                    damage += profile.Damage.Crit;
+                }
+                else if (roll >= toHit)
+                {
+                    damage += profile.Damage.Hit;
+                }
+            }
+            damages[damage] += 1;
+        }
+        return damages;
+    }
+
+    public Dictionary<double, double> CalculateAttacks(Profile profile, int toughness)
+    {
+        Dictionary<double, double> damages = new();
+        for (int i = 0; i < (profile.Damage.Crit * profile.Attacks) + 1; i++)
+        {
+            damages.Add(i, 0);
+        }
+        int toHit = CalculateToHit(profile.Strength, toughness);
+        List<Dice> dices = new();
+
+        for (int i = 0; i < profile.Attacks; i++)
+        {
+            dices.Add(new Dice(6));
+        }
+        for (int i = 0; i < Math.Pow(6, profile.Attacks); i++)
+        {
+            double damage = 0;
+            foreach (Dice dice in dices)
+            {
+                if (dice.Index == 6)
+                {
+                    dice.Index = 0;
+                    dices[dices.IndexOf(dice) + 1].Index++;
+                }
+                int roll = dice.Faces[dice.Index];
+                if (roll == 6)
+                {
+                    damage += profile.Damage.Crit;
+                }
+                else if (roll >= toHit)
+                {
+                    damage += profile.Damage.Hit;
+                }
+                if (dices.IndexOf(dice) == 0)
+                {
+                    dice.Index++;
+                }
+            }
+            damages[damage] += 1;
+        }
+        return damages;
+    }
+
+    private List<string> GetDPTLabels()
+    {
+        var labels = new List<string>();
+        for (var toughness = minimumToughness; toughness <= maximumToughness; toughness++)
+        {
+            labels.Add("T"+toughness);
+        }
+
+        return labels;
+    }
+
+    private List<IChartDataset> GetDefaultDataSets(int numberOfDatasets)
+    {
+        var datasets = new List<IChartDataset>();
+        int datasetCount = 0;
+        foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> ValuePair in dict)
+        {
+            datasets.Add(GetBarChartDataset(ValuePair.Key, ValuePair.Value, datasetCount));
+            datasetCount++;
+        }
+
+        return datasets;
+    }
+
+    private BarChartDataset GetBarChartDataset(Fighter fighter, Dictionary<double, Dictionary<double, double>> valuePairs, int datasetCount)
+    {
+        var c = ColorUtility.CategoricalTwelveColors[datasetCount].ToColor();
+
+        return new BarChartDataset()
+            {
+                Label = fighter.Name,
+                Data = GetRandomData(valuePairs),
+                BackgroundColor = new List<string> { c.ToRgbString() },
+                BorderColor = new List<string> { c.ToRgbString() },
+                BorderWidth = new List<double> { 0 },
+            };
+    }
+
+    private List<double?> GetRandomData(Dictionary<double, Dictionary<double, double>> valuePairs)
+    {
+        var data = new List<double?>();
+        foreach (KeyValuePair<double, Dictionary<double, double>> valuePair in valuePairs)
+        {
+            double rolls = 0;
+            double damage = 0;
+            foreach (KeyValuePair<double, double> damages in valuePair.Value)
+            {
+                rolls += damages.Value;
+                damage += damages.Key * damages.Value;
+            }
+            double average = damage / rolls;
+            double roundedAverage = Math.Round(average, 2);
+            data.Add(roundedAverage);
+        }
+        return data;
+    }
+}

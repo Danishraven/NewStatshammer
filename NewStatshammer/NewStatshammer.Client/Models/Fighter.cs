@@ -10,10 +10,11 @@ namespace NewStatshammer.Client.Models
         public Fighter()
         {
             Name = string.Empty;
-            Profiles = new List<Profile>
-            {
-                new Profile()
-            };
+            Profile profile = new();
+            profile.Active = true;
+            List<Profile> profiles = new();
+            profiles.Add(profile);
+            this.Profiles = profiles;
             Id = Guid.NewGuid();
         }
 
