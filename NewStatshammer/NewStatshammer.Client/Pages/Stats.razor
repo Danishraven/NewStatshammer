@@ -16,14 +16,9 @@
 </div>
 
 <BarChart @ref="averageDamagePerToughness" Width="1000" Height="300" />
-@* <LineChart @ref="lineChart" Width="1000" Height="300" /> *@
 
 @if (firstRendering)
 {
-    for (int toughness = minimumToughness; toughness <= maximumToughness; toughness++)
-    {
-        <LineChart @ref="lineCharts[toughness]" Width="1000" Height="300" />
-    }
     foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> kvp1 in dict)
     {
         <div>
@@ -51,14 +46,11 @@ else
 
 @code {
     BarChart averageDamagePerToughness = default!;
-    //LineChart lineChart = default!;
-    Dictionary<int ,LineChart> lineCharts = new();
 
     bool fastCalculation = false;
     List<Fighter> fighters = new();
     List<string> messages = new();
     bool firstRendering = false;
-    bool secondRendering = false;
     double simulations = 1000000;
     int minimumToughness = 3;
     int maximumToughness = 5;
@@ -94,20 +86,8 @@ else
             }
             CalculateDamage();
             await GenerateBarChart();
-            await GenerateLineChartList();
             firstRendering = true;
-            secondRendering = true;
             StateHasChanged();
-        }
-        else
-        {
-            if (secondRendering)
-            {
-                await GenerateCumulativeLineCharts();
-                secondRendering = false;
-                StateHasChanged();
-
-            }
         }
         await base.OnAfterRenderAsync(firstRender);
     }
@@ -319,97 +299,4 @@ else
         }
         return data;
     }
-
-    private async Task GenerateLineChartList()
-    {
-        for (int toughness = minimumToughness; toughness <= maximumToughness; toughness++)
-        {
-            LineChart lineChart = default!;
-            lineCharts.Add(toughness, lineChart);
-        }
-    }
-
-    private async Task GenerateCumulativeLineCharts()
-    {
-        List<string> lables = new();
-        for (int i = 0; i <= 40; i++)
-        {
-            lables.Add(i.ToString());
-        }
-        for (int toughness = minimumToughness; toughness <= maximumToughness; toughness++)
-        {
-            ChartData chartData = new ChartData { Labels = lables, Datasets = GetCumulativeLineChartDataSets(toughness) };
-            LineChartOptions lineChartOptions = new LineChartOptions { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
-            lineChartOptions.Plugins.Title = new ChartPluginsTitle { Text = "T" + toughness, Display = true, Font = new ChartFont { Size = 20 } };
-            await lineCharts[toughness].InitializeAsync(chartData, lineChartOptions);
-            StateHasChanged();
-        }
-    }
-
-    private List<IChartDataset> GetCumulativeLineChartDataSets(int toughness)
-    {
-        var datasets = new List<IChartDataset>();
-        int datasetCount = 0;
-        foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> ValuePair in dict)
-        {
-            datasets.Add(GetCumulativeLineChartDataset(ValuePair.Key, ValuePair.Value[toughness], datasetCount, toughness));
-            datasetCount++;
-        }
-
-        return datasets;
-    }
-
-    private BarChartDataset GetCumulativeLineChartDataset(Fighter fighter, Dictionary<double, double> valuePairs, int datasetCount, int toughness)
-    {
-        var c = ColorUtility.CategoricalTwelveColors[datasetCount].ToColor();
-        List<double?> unmodifiedData = GetLinechartData(valuePairs, toughness);
-        List<double?> modifiedData = new();
-
-        foreach (double? d in unmodifiedData)
-        {
-            if (d is not null)
-            {
-                double data = Convert.ToDouble(d) * 100;
-                data = Math.Round(data, 2);
-                modifiedData.Add(data);
-            }
-        }
-
-        return new BarChartDataset()
-            {
-                Label = fighter.Name,
-                Data = modifiedData,
-                BackgroundColor = new List<string> { c.ToRgbString() },
-                BorderColor = new List<string> { c.ToRgbString() },
-                BorderWidth = new List<double> { 0 },
-            };
-    }
-
-    private List<double?> GetLinechartData(Dictionary<double, double> valuePairs, int toughness)
-    {
-        double total = 0;
-        double? last = 0;
-        List<double?> values = new();
-        foreach (KeyValuePair<double, double> keyValuePair in valuePairs)
-        {
-            total += keyValuePair.Value;
-        }
-
-        foreach (KeyValuePair<double, double> keyValuePair in valuePairs)
-        {
-            double? value = keyValuePair.Value / total;
-            if (value == 0)
-            {
-                value = values.Last();
-            }
-            else
-            {
-                value += last;
-                last = value;
-            }
-            values.Add(value);
-        }
-        return values;
-    }
-
 }
