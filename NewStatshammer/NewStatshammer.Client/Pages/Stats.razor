@@ -6,9 +6,8 @@
 
 <h1>Statistics</h1>
 
-<input type="checkbox" @bind="fastCalculation" @bind:after="CalculateGenerateGraphs" />
+<input type="checkbox" @bind="fastCalculation" @bind:after="GenerateBarChart" />
 
-<BarChart @ref="averageDamagePerToughness" Width="1000" Height="300" />
 <div>
     @foreach (string s in messages)
     {
@@ -16,15 +15,23 @@
     }
 </div>
 
+<BarChart @ref="averageDamagePerToughness" Width="1000" Height="300" />
+@* <LineChart @ref="lineChart" Width="1000" Height="300" /> *@
+
 @if (firstRendering)
 {
-    @* foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> kvp1 in dict)
+    for (int toughness = minimumToughness; toughness <= maximumToughness; toughness++)
+    {
+        <LineChart @ref="lineCharts[toughness]" Width="1000" Height="300" />
+    }
+    foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> kvp1 in dict)
     {
         <div>
             @kvp1.Key.Name
             @foreach (KeyValuePair<double, Dictionary<double, double>> item in kvp1.Value)
             {
-                <div>                    
+                <div>
+                    @("toughness: " + item.Key)
                     @foreach (KeyValuePair<double, double> kvp3 in item.Value)
                     {
                         <div style="color:rgb(255,0,0)">
@@ -35,7 +42,7 @@
                 </div>
             }
         </div>
-    } *@
+    }
 }
 else
 {
@@ -44,16 +51,19 @@ else
 
 @code {
     BarChart averageDamagePerToughness = default!;
-    List<LineChart> lineCharts = default!;
+    //LineChart lineChart = default!;
+    Dictionary<int ,LineChart> lineCharts = new();
 
     bool fastCalculation = false;
     List<Fighter> fighters = new();
     List<string> messages = new();
     bool firstRendering = false;
+    bool secondRendering = false;
     double simulations = 1000000;
     int minimumToughness = 3;
     int maximumToughness = 5;
     Dictionary<Fighter, Dictionary<double, Dictionary<double, double>>> dict = new();
+    Random random = new();
     //Datastructure
     //dict key: Fighter
     //dict value: ToughnessDamagePairs (DTP)
@@ -76,26 +86,30 @@ else
             {
                 foreach (Profile profile in fighter.Profiles)
                 {
-                    if (profile.Active && profile.Attacks > 8)
+                    if (profile.Active && profile.Attacks > 5)
                     {
                         fastCalculation = true;
                     }
                 }
             }
-            await CalculateGenerateGraphs();
+            CalculateDamage();
+            await GenerateBarChart();
+            await GenerateLineChartList();
             firstRendering = true;
+            secondRendering = true;
             StateHasChanged();
         }
-        await base.OnAfterRenderAsync(firstRender);
-    }
+        else
+        {
+            if (secondRendering)
+            {
+                await GenerateCumulativeLineCharts();
+                secondRendering = false;
+                StateHasChanged();
 
-    public async Task CalculateGenerateGraphs()
-    {
-        dict = new();
-        await CalculateDamage();
-        ChartData chartData = new ChartData { Labels = GetDPTLabels(), Datasets = GetDefaultDataSets(3) };
-        BarChartOptions barChartOptions = new BarChartOptions { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
-        await averageDamagePerToughness.InitializeAsync(chartData, barChartOptions);
+            }
+        }
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     private async Task LoadFighters()
@@ -120,8 +134,9 @@ else
         }
     }
 
-    public async Task CalculateDamage()
+    public void CalculateDamage()
     {
+        dict = new();
         Random random = new();
         foreach (Fighter fighter in fighters)
         {
@@ -142,13 +157,13 @@ else
                         {
                             damages = CalculateAttacks(profile, toughness);
                         }
-                        for (int i = 0; i < (profile.Damage.Crit * profile.Attacks) + 1; i++)
-                        {
-                            if (damages[i] == 0)
-                            {
-                                damages.Remove(i);
-                            }
-                        }
+                        // for (int i = 0; i < (profile.Damage.Crit * profile.Attacks) + 1; i++)
+                        // {
+                        //     if (damages[i] == 0)
+                        //     {
+                        //         damages.Remove(i);
+                        //     }
+                        // }
                         toughnessDamagePairs.Add(toughness, damages);
                     }
                     dict.Add(fighter, toughnessDamagePairs);
@@ -241,6 +256,13 @@ else
         return damages;
     }
 
+    public async Task GenerateBarChart()
+    {
+        ChartData chartData = new ChartData { Labels = GetDPTLabels(), Datasets = GetBarchartDataSets() };
+        BarChartOptions barChartOptions = new BarChartOptions { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
+        await averageDamagePerToughness.InitializeAsync(chartData, barChartOptions);
+    }
+
     private List<string> GetDPTLabels()
     {
         var labels = new List<string>();
@@ -252,7 +274,7 @@ else
         return labels;
     }
 
-    private List<IChartDataset> GetDefaultDataSets(int numberOfDatasets)
+    private List<IChartDataset> GetBarchartDataSets()
     {
         var datasets = new List<IChartDataset>();
         int datasetCount = 0;
@@ -272,14 +294,14 @@ else
         return new BarChartDataset()
             {
                 Label = fighter.Name,
-                Data = GetRandomData(valuePairs),
+                Data = GetBarchartData(valuePairs),
                 BackgroundColor = new List<string> { c.ToRgbString() },
                 BorderColor = new List<string> { c.ToRgbString() },
                 BorderWidth = new List<double> { 0 },
             };
     }
 
-    private List<double?> GetRandomData(Dictionary<double, Dictionary<double, double>> valuePairs)
+    private List<double?> GetBarchartData(Dictionary<double, Dictionary<double, double>> valuePairs)
     {
         var data = new List<double?>();
         foreach (KeyValuePair<double, Dictionary<double, double>> valuePair in valuePairs)
@@ -297,4 +319,97 @@ else
         }
         return data;
     }
+
+    private async Task GenerateLineChartList()
+    {
+        for (int toughness = minimumToughness; toughness <= maximumToughness; toughness++)
+        {
+            LineChart lineChart = default!;
+            lineCharts.Add(toughness, lineChart);
+        }
+    }
+
+    private async Task GenerateCumulativeLineCharts()
+    {
+        List<string> lables = new();
+        for (int i = 0; i <= 40; i++)
+        {
+            lables.Add(i.ToString());
+        }
+        for (int toughness = minimumToughness; toughness <= maximumToughness; toughness++)
+        {
+            ChartData chartData = new ChartData { Labels = lables, Datasets = GetCumulativeLineChartDataSets(toughness) };
+            LineChartOptions lineChartOptions = new LineChartOptions { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
+            lineChartOptions.Plugins.Title = new ChartPluginsTitle { Text = "T" + toughness, Display = true, Font = new ChartFont { Size = 20 } };
+            await lineCharts[toughness].InitializeAsync(chartData, lineChartOptions);
+            StateHasChanged();
+        }
+    }
+
+    private List<IChartDataset> GetCumulativeLineChartDataSets(int toughness)
+    {
+        var datasets = new List<IChartDataset>();
+        int datasetCount = 0;
+        foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> ValuePair in dict)
+        {
+            datasets.Add(GetCumulativeLineChartDataset(ValuePair.Key, ValuePair.Value[toughness], datasetCount, toughness));
+            datasetCount++;
+        }
+
+        return datasets;
+    }
+
+    private BarChartDataset GetCumulativeLineChartDataset(Fighter fighter, Dictionary<double, double> valuePairs, int datasetCount, int toughness)
+    {
+        var c = ColorUtility.CategoricalTwelveColors[datasetCount].ToColor();
+        List<double?> unmodifiedData = GetLinechartData(valuePairs, toughness);
+        List<double?> modifiedData = new();
+
+        foreach (double? d in unmodifiedData)
+        {
+            if (d is not null)
+            {
+                double data = Convert.ToDouble(d) * 100;
+                data = Math.Round(data, 2);
+                modifiedData.Add(data);
+            }
+        }
+
+        return new BarChartDataset()
+            {
+                Label = fighter.Name,
+                Data = modifiedData,
+                BackgroundColor = new List<string> { c.ToRgbString() },
+                BorderColor = new List<string> { c.ToRgbString() },
+                BorderWidth = new List<double> { 0 },
+            };
+    }
+
+    private List<double?> GetLinechartData(Dictionary<double, double> valuePairs, int toughness)
+    {
+        double total = 0;
+        double? last = 0;
+        List<double?> values = new();
+        foreach (KeyValuePair<double, double> keyValuePair in valuePairs)
+        {
+            total += keyValuePair.Value;
+        }
+
+        foreach (KeyValuePair<double, double> keyValuePair in valuePairs)
+        {
+            double? value = keyValuePair.Value / total;
+            if (value == 0)
+            {
+                value = values.Last();
+            }
+            else
+            {
+                value += last;
+                last = value;
+            }
+            values.Add(value);
+        }
+        return values;
+    }
+
 }
