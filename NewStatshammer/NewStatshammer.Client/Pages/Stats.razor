@@ -6,52 +6,97 @@
 
 <h1>Statistics</h1>
 
-<input type="checkbox" @bind="fastCalculation" @bind:after="GenerateBarChart" />
-
 <div>
-    @foreach (string s in messages)
-    {
-        @s
-    }
+    <div>
+        <div>
+            <label for="minimumToughness">Minimum Toughness</label>
+            <input type="number" @bind="minimumToughness" id="minimumToughness" @bind:after="DoMath" />
+            <label for="maximumToughness">Maximum Toughness</label>
+            <input type="number" @bind="maximumToughness" id="maximumToughness" @bind:after="DoMath" />
+        </div>
+        <div>
+            <label for="fastCalc">Enable/Disable fast calculation</label>
+            <input type="checkbox" @bind="fastCalculation" id="fastCalc" @bind:after="DoMath" />
+        </div>
+    </div>
+    <div>
+        <div class="flex-container">
+            <div class="graph-container">
+                <BarChart @ref="averageDamagePerToughness" Width="100" Height="100" WidthUnit="Unit.Percentage" HeightUnit="Unit.Percentage" />
+            </div>
+            <div class="graph-container">
+                @if (firstRendering)
+                {
+                    <h1>Khorne renders</h1>
+                }
+                else
+                {
+                    <table class="damage-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                @for (int i = minimumToughness; i <= maximumToughness; i++)
+                                {
+                                    <th>@("T" + i)</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (KeyValuePair<string, List<double?>> valuePair in averageDamagePerToughnessNumbers)
+                            {
+                                <tr>
+                                    <td>
+                                        @valuePair.Key
+                                    </td>
+                                    @foreach (double? damage in valuePair.Value)
+                                    {
+                                        <td>
+                                            @damage
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
 </div>
 
-<BarChart @ref="averageDamagePerToughness" Width="1000" Height="300" />
-
-@if (firstRendering)
-{
-    foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> kvp1 in dict)
-    {
-        <div>
-            @kvp1.Key.Name
-            @foreach (KeyValuePair<double, Dictionary<double, double>> item in kvp1.Value)
-            {
-                <div>
-                    @("toughness: " + item.Key)
-                    @foreach (KeyValuePair<double, double> kvp3 in item.Value)
-                    {
-                        <div style="color:rgb(255,0,0)">
-                            damage @kvp3.Key : 
-                            @kvp3.Value
-                        </div>
-                    }
-                </div>
-            }
-        </div>
+<style>
+    .graph-container{
+        width: 40%;
+        min-height: 300px;
+        align-content: center;
     }
-}
-else
-{
-    <h1>Khorne renders</h1>
-}
+
+    .flex-container {
+        display: flex;
+        flex-flow: wrap;
+        flex-direction: row;
+        justify-content: space-between;
+        background-color: #333;
+        margin-top: 20px;
+        border-radius: 5px;
+        padding: 25px;
+    }
+
+    .damage-table{
+        width: 100%
+    }
+</style>
 
 @code {
     BarChart averageDamagePerToughness = default!;
+    Dictionary<string, List<double?>> averageDamagePerToughnessNumbers = new();
 
     bool fastCalculation = false;
+    bool successfulLoad = false;
     List<Fighter> fighters = new();
     List<string> messages = new();
-    bool firstRendering = false;
-    double simulations = 1000000;
+    bool firstRendering = true;
+    double simulations = 100000;
     int minimumToughness = 3;
     int maximumToughness = 5;
     Dictionary<Fighter, Dictionary<double, Dictionary<double, double>>> dict = new();
@@ -73,26 +118,57 @@ else
     {
         if (firstRender)
         {
-            await LoadFighters();
-            foreach (Fighter fighter in fighters)
+            successfulLoad = await LoadFighters();
+            if (successfulLoad)
             {
-                foreach (Profile profile in fighter.Profiles)
+                double smallestStrength = 0;
+                double biggestStrength = 0;
+                foreach (Fighter fighter in fighters)
                 {
-                    if (profile.Active && profile.Attacks > 5)
+                    foreach (Profile profile in fighter.Profiles)
                     {
-                        fastCalculation = true;
+                        if (profile.Active)
+                        {
+                            if (smallestStrength == 0)
+                            {
+                                smallestStrength = profile.Strength;
+                                biggestStrength = profile.Strength;
+                            }
+                            if (smallestStrength > profile.Strength)
+                            {
+                                smallestStrength = profile.Strength;
+                            }
+                            if (biggestStrength < profile.Strength)
+                            {
+                                biggestStrength = profile.Strength;
+                            }
+                            if (profile.Attacks > 6)
+                            {
+                                fastCalculation = true;
+                            }
+                        }
+
                     }
                 }
+                minimumToughness = Convert.ToInt32(smallestStrength) - 1;
+                maximumToughness = Convert.ToInt32(biggestStrength)+ 1;
+                await DoMath();
             }
-            CalculateDamage();
-            await GenerateBarChart();
-            firstRendering = true;
+            StateHasChanged();
+            firstRendering = false;
             StateHasChanged();
         }
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    private async Task LoadFighters()
+    public async Task DoMath()
+    {
+        StateHasChanged();
+        CalculateDamage();
+        await GenerateBarChart();
+    }
+
+    private async Task<bool> LoadFighters()
     {
 
         List<Fighter>? storage = null;
@@ -107,10 +183,12 @@ else
         if (storage != null)
         {
             fighters = storage;
+            return true;
         }
         else
         {
             fighters.Add(new Fighter());
+            return false;
         }
     }
 
@@ -146,7 +224,16 @@ else
                         // }
                         toughnessDamagePairs.Add(toughness, damages);
                     }
-                    dict.Add(fighter, toughnessDamagePairs);
+                    try
+                    {
+                        dict.Add(fighter, toughnessDamagePairs);
+                    }
+                    catch (Exception e)
+                    {
+                        messages.Add(e.Message);
+                        throw;
+                    }
+                    
                 }
             }
         }
@@ -238,9 +325,17 @@ else
 
     public async Task GenerateBarChart()
     {
+        averageDamagePerToughnessNumbers.Clear();
         ChartData chartData = new ChartData { Labels = GetDPTLabels(), Datasets = GetBarchartDataSets() };
-        BarChartOptions barChartOptions = new BarChartOptions { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index } };
-        await averageDamagePerToughness.InitializeAsync(chartData, barChartOptions);
+        BarChartOptions barChartOptions = new BarChartOptions { Responsive = true, Interaction = new Interaction { Mode = InteractionMode.Index }, MaintainAspectRatio = false };
+        if (firstRendering)
+        {
+            await averageDamagePerToughness.InitializeAsync(chartData, barChartOptions);
+        }
+        else
+        {
+            await averageDamagePerToughness.UpdateAsync(chartData, barChartOptions);
+        }
     }
 
     private List<string> GetDPTLabels()
@@ -256,25 +351,44 @@ else
 
     private List<IChartDataset> GetBarchartDataSets()
     {
+        
         var datasets = new List<IChartDataset>();
+        
         int datasetCount = 0;
         foreach (KeyValuePair<Fighter, Dictionary<double, Dictionary<double, double>>> ValuePair in dict)
         {
-            datasets.Add(GetBarChartDataset(ValuePair.Key, ValuePair.Value, datasetCount));
-            datasetCount++;
+            try
+            {
+                datasets.Add(GetBarChartDataset(ValuePair.Key, ValuePair.Value, datasetCount));
+                datasetCount++;
+                }
+            catch (Exception e)
+            {
+                messages.Add(e.Message);
+                continue;
+            }
         }
-
+        
         return datasets;
     }
 
     private BarChartDataset GetBarChartDataset(Fighter fighter, Dictionary<double, Dictionary<double, double>> valuePairs, int datasetCount)
     {
         var c = ColorUtility.CategoricalTwelveColors[datasetCount].ToColor();
-
+        List<double?> data = GetBarchartData(valuePairs);
+        try
+        {
+            averageDamagePerToughnessNumbers.Add(fighter.Name, data);
+        }
+        catch (Exception e)
+        {
+            messages.Add(e.Message);
+            throw;
+        }
         return new BarChartDataset()
             {
                 Label = fighter.Name,
-                Data = GetBarchartData(valuePairs),
+                Data = data,
                 BackgroundColor = new List<string> { c.ToRgbString() },
                 BorderColor = new List<string> { c.ToRgbString() },
                 BorderWidth = new List<double> { 0 },

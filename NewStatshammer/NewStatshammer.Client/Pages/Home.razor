@@ -2,18 +2,26 @@
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 <PageTitle>Home</PageTitle>
 
-<div>
+<div class="main-view">
     <h3>Fighters</h3>
     @if (firstRendering)
     {
         @foreach (Fighter fighter in fighters)
         {
             <div class="fighter">
-                <div>
-                    <label for="fname">Fighter Name</label>
-                        <input type="text" id="fname" name="fname" @bind="fighter.Name" @bind:after="SaveFighters"/>
-                    <button @onclick="() => fighters.Add(fighter.CopyFighter())">Copy</button>
-                    <button @onclick="() => RemoveFighter(fighter.Id)">Delete Fighter</button>
+                <div class="flex-container">
+                    <div class="input-container name-input">
+                        <label class="profile-lable" for="fname">Fighter Name</label>
+                        <input class="profile-input" type="text" id="fname" name="fname" @bind="fighter.Name" @bind:after="SaveFighters" />
+                    </div>
+                    <div>
+                        <button class="small-button" @onclick="() => CopyFighter(fighter)">
+                            <Icon Name="IconName.Copy" />
+                        </button>
+                        <button class="small-button" @onclick="() => RemoveFighter(fighter.Id)">
+                            <Icon Name="IconName.Trash3Fill" />
+                        </button>
+                    </div>
                 </div>
                 @foreach (Profile profile in fighter.Profiles)
                 {
@@ -30,9 +38,9 @@
                         </div>
                         <div class="input-container">
                             <label class="profile-lable" for="patk">Attacks</label>
-                            @if (profile.Attacks > 8)
+                            @if (profile.Attacks > 6)
                             {
-                                <label style="color: red; font-size: 10px; left: 40px; top: 5px; position: absolute">Preformance suffers if attacks is higher than 8</label>
+                                <label style="color: red; font-size: 8px; left: 40px; top: 5px; position: absolute">Preformance suffers if the number of attacks is higher than 6</label>
                             }
                             <input class="profile-input" type="number" id="patk" name="patk" @bind="profile.Attacks" @bind:after="SaveFighters" />
                         </div>
@@ -48,25 +56,20 @@
                             <label class="profile-lable" for="pcrit">Crit</label>
                             <input class="profile-input" type="number" id="pcrit" name="pcrit" @bind="profile.Damage.Crit" @bind:after="SaveFighters" />
                         </div>
-                        @if (fighter.Profiles.Count > 1)
-                        {
-                            <button @onclick="() => RemoveProfile(fighter, profile.Id)">Delete Profile</button>
-                        }
-                        else
-                        {
-                            <button @onclick="() => RemoveProfile(fighter, profile.Id)" disabled>Delete Profile</button>
-                        }
+                        <button class="small-button" @onclick="() => RemoveProfile(fighter, profile.Id)" disabled="@(fighter.Profiles.Count < 2)">
+                            <Icon Name="IconName.Trash3Fill" />
+                        </button>
 
                     </div>
                 }
-                <div>
-                    <button @onclick="() => AddProfile(fighter)">Add Profile</button>
+                <div class="add-profile-container">
+                    <button class="add-profile" @onclick="() => AddProfile(fighter)">Add Profile</button>
                 </div>
             </div>
 
         }
-        <div>
-            <button @onclick="() => AddFighter()">Add Fighter</button>
+        <div class="add-fighter-container">
+            <button class="add-fighter" @onclick="() => AddFighter()">Add Fighter</button>
         </div>
         @foreach (string s in messages)
         {
@@ -156,6 +159,7 @@
         height: 45px;
         width: 15%;
         margin: 5px;
+        border-radius: 5px;
     }
 
     .profile-input{
@@ -179,7 +183,57 @@
 
     .fighter{
         background-color: #333;
-        margin: 10px;
+        padding: 25px;
+        margin-top: 20px;
+        border-radius: 5px;
+    }
+
+    .small-button{
+        height: 32px;
+        width: 32px;
+        background: none;
+        color: white;
+        border: 0;
+        position: relative;
+        right: 0
+    }
+
+    .small-button:disabled{
+        height: 32px;
+        width: 32px;
+        background: none;
+        color: black;
+        border: 0;
+        position: relative;
+        right: 0
+    }
+    .name-input{
+        width: calc(100% - 96px);
+    }
+
+    .main-view{
+        padding: 10px
+    }
+
+    .add-profile-container {
+    }
+
+    .add-profile {
+        width: 100%;
+        margin-top: 10px;
+        border-radius: 5px;
+        background-color: orange;
+    }
+
+    .add-fighter-container{
+        
+    }
+
+    .add-fighter{
+        width: 100%;
+        margin-top: 10px;
+        border-radius: 5px;
+        background-color: #f44336;
     }
 </style>
 @code{
@@ -216,6 +270,12 @@
     public void AddFighter()
     {
         fighters.Add(new Fighter());
+        SaveFighters();
+    }
+
+    public void CopyFighter(Fighter fighter)
+    {
+        fighters.Add(fighter.CopyFighter());
         SaveFighters();
     }
 
