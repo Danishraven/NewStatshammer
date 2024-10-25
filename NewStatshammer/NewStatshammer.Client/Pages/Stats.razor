@@ -4,9 +4,11 @@
 
 <PageTitle>Counter</PageTitle>
 
+<input type="checkbox" @bind="calculating" />
+
 <h1>Statistics</h1>
 
-<div>
+<div style="@IsMathing(calculating)">
     <div>
         <div>
             <label for="minimumToughness">Minimum Toughness</label>
@@ -25,50 +27,48 @@
                 <BarChart @ref="averageDamagePerToughness" Width="100" Height="100" WidthUnit="Unit.Percentage" HeightUnit="Unit.Percentage" />
             </div>
             <div class="graph-container">
-                @if (firstRendering)
-                {
-                    <h1>Khorne renders</h1>
-                }
-                else
-                {
-                    <table class="damage-table">
-                        <thead>
+                <table class="damage-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            @for (int i = minimumToughness; i <= maximumToughness; i++)
+                            {
+                                <th>@("T" + i)</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (KeyValuePair<string, List<double?>> valuePair in averageDamagePerToughnessNumbers)
+                        {
                             <tr>
-                                <th></th>
-                                @for (int i = minimumToughness; i <= maximumToughness; i++)
+                                <td>
+                                    @valuePair.Key
+                                </td>
+                                @foreach (double? damage in valuePair.Value)
                                 {
-                                    <th>@("T" + i)</th>
+                                    <td>
+                                        @damage
+                                    </td>
                                 }
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (KeyValuePair<string, List<double?>> valuePair in averageDamagePerToughnessNumbers)
-                            {
-                                <tr>
-                                    <td>
-                                        @valuePair.Key
-                                    </td>
-                                    @foreach (double? damage in valuePair.Value)
-                                    {
-                                        <td>
-                                            @damage
-                                        </td>
-                                    }
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
+                        }
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
+@* <div style="@IsMathing(!calculating)">
+    <h1>Khorne renders</h1>
+</div> *@
 
 <style>
     .graph-container{
-        width: 40%;
+        width: 50%;
         min-height: 300px;
         align-content: center;
+        border-radius: 5px;
+        padding: 10px;
     }
 
     .flex-container {
@@ -83,7 +83,10 @@
     }
 
     .damage-table{
-        width: 100%
+        width: 100%;
+        table-layout: fixed;
+        background-color: rgba(255, 255, 255, 0.09);
+        border-radius: 5px;
     }
 </style>
 
@@ -93,10 +96,11 @@
 
     bool fastCalculation = false;
     bool successfulLoad = false;
+    bool calculating = true;
     List<Fighter> fighters = new();
     List<string> messages = new();
     bool firstRendering = true;
-    double simulations = 100000;
+    double simulations = 50000;
     int minimumToughness = 3;
     int maximumToughness = 5;
     Dictionary<Fighter, Dictionary<double, Dictionary<double, double>>> dict = new();
@@ -118,6 +122,7 @@
     {
         if (firstRender)
         {
+            StateHasChanged();
             successfulLoad = await LoadFighters();
             if (successfulLoad)
             {
@@ -142,7 +147,7 @@
                             {
                                 biggestStrength = profile.Strength;
                             }
-                            if (profile.Attacks > 6)
+                            if (profile.Attacks > 6 || biggestStrength + 1 - smallestStrength > 6)
                             {
                                 fastCalculation = true;
                             }
@@ -158,14 +163,24 @@
             firstRendering = false;
             StateHasChanged();
         }
-        await base.OnAfterRenderAsync(firstRender);
+        //await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public string IsMathing(bool mathing)
+    {
+        if (mathing)
+        {
+            return "display: none";
+        }
+        return "";
     }
 
     public async Task DoMath()
     {
-        StateHasChanged();
         CalculateDamage();
         await GenerateBarChart();
+        calculating = false;
+        StateHasChanged();
     }
 
     private async Task<bool> LoadFighters()
@@ -233,7 +248,7 @@
                         messages.Add(e.Message);
                         throw;
                     }
-                    
+
                 }
             }
         }
@@ -252,13 +267,19 @@
         else return 4;
     }
 
-    public Dictionary<double, double> SimulateAttacks(Profile profile, int toughness)
+    public Dictionary< double, double> CreateDamagesDictionary(Profile profile)
     {
         Dictionary<double, double> damages = new();
-        for (int i = 0; i < (profile.Damage.Crit * profile.Attacks) + 1; i++)
+        for (int i = 0; i < (Math.Max(profile.Damage.Crit, profile.Damage.Hit) * profile.Attacks) + 1; i++)
         {
             damages.Add(i, 0);
         }
+        return damages;
+    }
+
+    public Dictionary<double, double> SimulateAttacks(Profile profile, int toughness)
+    {
+        Dictionary<double, double> damages = CreateDamagesDictionary(profile);
         int toHit = CalculateToHit(profile.Strength, toughness);
         for (int j = 0; j < simulations; j++)
         {
@@ -282,11 +303,7 @@
 
     public Dictionary<double, double> CalculateAttacks(Profile profile, int toughness)
     {
-        Dictionary<double, double> damages = new();
-        for (int i = 0; i < (profile.Damage.Crit * profile.Attacks) + 1; i++)
-        {
-            damages.Add(i, 0);
-        }
+        Dictionary<double, double> damages = CreateDamagesDictionary(profile);
         int toHit = CalculateToHit(profile.Strength, toughness);
         List<Dice> dices = new();
 
